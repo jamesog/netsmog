@@ -18,6 +18,35 @@ import (
 //  * UI for viewing graphs
 //  * worker API (fetch configs, post results)
 
+func results(dbClient *influxdb.Client) {
+	results, err := dbClient.Query("select * from www1", "s")
+	// fmt.Printf("%q\n", results)
+	if err != nil {
+		log.Fatalf("Herp derp: %s\n", err)
+	}
+	for _, series := range results {
+		// fmt.Printf("Series %d\n--------\n", i)
+		fmt.Printf("Series: %s\n", series.Name)
+		for _, column := range series.Columns {
+			fmt.Printf("%s\t", column)
+		}
+		fmt.Println()
+		for _, point := range series.Points {
+			for _, c := range point {
+				switch c := c.(type) {
+				case string:
+					fmt.Printf("%s\t", c)
+				case int:
+					fmt.Printf("%d\t", c)
+				case float64:
+					fmt.Printf("%.02f\t", c)
+				}
+			}
+			fmt.Println()
+		}
+	}
+}
+
 func main() {
 	var confFile = flag.String("config", "config.toml", "config file, in TOML format")
 	flag.Parse()
@@ -68,31 +97,5 @@ func main() {
 	} else {
 		// log.Printf("Connected to %s version %s\n", dbClient.Addr(), v)
 		log.Println("Connected to InfluxDB.")
-	}
-	results, err := dbClient.Query("select * from www1", "s")
-	// fmt.Printf("%q\n", results)
-	if err != nil {
-		log.Fatalf("Herp derp: %s\n", err)
-	}
-	for _, series := range results {
-		// fmt.Printf("Series %d\n--------\n", i)
-		fmt.Printf("Series: %s\n", series.Name)
-		for _, column := range series.Columns {
-			fmt.Printf("%s\t", column)
-		}
-		fmt.Println()
-		for _, point := range series.Points {
-			for _, c := range point {
-				switch c := c.(type) {
-				case string:
-					fmt.Printf("%s\t", c)
-				case int:
-					fmt.Printf("%d\t", c)
-				case float64:
-					fmt.Printf("%.02f\t", c)
-				}
-			}
-			fmt.Println()
-		}
 	}
 }
