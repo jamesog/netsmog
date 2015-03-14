@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -19,7 +20,6 @@ type config map[string]target
 
 type target struct {
 	Interval int
-	Title    string
 	Host     string
 	Probe    string
 }
@@ -29,6 +29,20 @@ type target struct {
 // Connect to server over HTTP and fetch config (must be santised)
 // Parse config, determine jobs to run and intervals
 // Implement probes
+
+func runProbe(target *target) {
+	probe := target.Probe
+	interval := target.Interval
+	host := target.Host
+	go func() {
+		log.Printf("Launching probe %s every %ds against %s\n",
+			probe, interval, host)
+		for {
+			time.Sleep(time.Duration(interval) * time.Second)
+			log.Printf("PROBE %s: %s\n", probe, host)
+		}
+	}()
+}
 
 func main() {
 	fmt.Println("NetSmog Worker, version", version)
@@ -93,5 +107,10 @@ func main() {
 		log.Fatal("config error")
 	}
 	log.Println("so far so good")
-	fmt.Printf("Config:\n%+v\n", config)
+	// fmt.Printf("Config:\n%+v\n", config)
+	c := make(chan struct{})
+	for _, target := range config {
+		runProbe(&target)
+	}
+	<-c
 }
