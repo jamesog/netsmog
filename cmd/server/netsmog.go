@@ -1,13 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"github.com/gorilla/handlers"
 	influxdb "github.com/influxdb/influxdb/client"
 )
 
@@ -45,6 +48,21 @@ func results(dbClient *influxdb.Client) {
 			fmt.Println()
 		}
 	}
+}
+
+func worker(c *map[string]TargetGroup) http.Handler {
+	// Pass the worker a JSON object with its tasks
+	json := func(w http.ResponseWriter, r *http.Request) {
+		worker := r.Header.Get("Worker")
+		// TODO(jamesog): Tally this with the Authorisation header
+		log.Println("Received request from", worker)
+		// TODO(jamesog): Query the config for all targets this worker is a
+		// member of and create a new struct to pass to json.Marshal()
+		t, _ := json.Marshal(c)
+		w.Write(t)
+	}
+
+	return http.HandlerFunc(json)
 }
 
 func main() {
@@ -97,5 +115,13 @@ func main() {
 	} else {
 		// log.Printf("Connected to %s version %s\n", dbClient.Addr(), v)
 		log.Println("Connected to InfluxDB.")
+	}
+
+	w := worker(&config.Targets)
+	http.Handle("/", handlers.LoggingHandler(os.Stdout, http.NotFoundHandler()))
+	http.Handle("/worker", handlers.LoggingHandler(os.Stdout, w))
+	log.Println("Listening on :8080")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		log.Fatal("ListenAndServe: ", err)
 	}
 }
