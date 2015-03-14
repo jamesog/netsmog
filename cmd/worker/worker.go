@@ -1,12 +1,27 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
+	"os"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
-const VERSION string = "0.1"
+const version string = "0.1"
+
+type config struct {
+	Targets map[string]target
+}
+
+type target struct {
+	Interval int
+}
 
 // TODO(jamesog):
 // Read shared secret from a file
@@ -15,11 +30,67 @@ const VERSION string = "0.1"
 // Implement probes
 
 func main() {
-	fmt.Println("NetSmog Worker, version", VERSION)
+	fmt.Println("NetSmog Worker, version", version)
 
 	var server = flag.String("server", "", "server URL")
+	var secretFile = flag.String("secret", "", "shared secret file")
+	defaultWorker, err := os.Hostname()
+	if err != nil {
+		log.Fatal("could not determine hostname")
+	}
+	var worker = flag.String("worker", defaultWorker, "worker name")
 	flag.Parse()
 	if *server == "" {
 		log.Fatal("no server specified")
 	}
+	if *secretFile == "" {
+		log.Fatal("no shared secret file specified")
+	}
+
+	secret, err := ioutil.ReadFile(*secretFile)
+	if err != nil {
+		log.Fatal("could not read shared secret: ", err)
+	}
+
+	// Construct HTTP header for passing an authorisation to the server
+	// This is a hash of worker:secret, similar to HTTP Basic
+	hash, err := bcrypt.GenerateFromPassword(
+		[]byte(fmt.Sprintf("%s:%s", worker, secret)),
+		bcrypt.DefaultCost)
+	if err != nil {
+		log.Fatal("could not generate hash")
+	}
+
+	hashstr := base64.URLEncoding.EncodeToString(hash)
+	fmt.Println("Hash:", hashstr)
+
+	httpClient := &http.Client{}
+	req, err := http.NewRequest("GET", *server, nil)
+	if err != nil {
+		log.Fatal("could not construct HTTP request")
+	}
+	req.Header.Add("User-Agent", fmt.Sprintf("NetSmog Worker version %s", version))
+	req.Header.Add("Worker", *worker)
+	req.Header.Add("Authorisation", hashstr)
+	log.Println("fetching configuration from ", *server)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		log.Fatal("HTTP protocol error: ", err)
+	}
+	if resp.StatusCode == 200 {
+		log.Println("got a response")
+	} else {
+		log.Fatal("something went wrong")
+	}
+	var config config
+	jsonResponse, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal("JSON read error")
+	}
+	err = json.Unmarshal(jsonResponse, &config)
+	if err != nil {
+		log.Fatal("config error")
+	}
+	log.Println("so far so good")
+	fmt.Printf("Config:\n%+v\n", config)
 }
