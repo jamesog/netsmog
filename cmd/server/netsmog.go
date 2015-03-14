@@ -56,9 +56,24 @@ func workerHandler(c *map[string]TargetGroup) http.Handler {
 		worker := r.Header.Get("Worker")
 		// TODO(jamesog): Tally this with the Authorisation header
 		log.Println("Received request from", worker)
-		// TODO(jamesog): Query the config for all targets this worker is a
-		// member of and create a new struct to pass to json.Marshal()
-		t, _ := json.Marshal(c)
+		// Query the config for all targets this worker is a member of
+		// and create a new struct to pass to json.Marshal()
+		// TODO(jamesog): This only checks the "workers" virtual group
+		// It should also check inside each target
+		workerTargets := make(TargetGroup)
+		for _, group := range *c {
+			for _, w := range group["workers"].Workers {
+				if w == worker {
+					for t, target := range group {
+						if t == "workers" {
+							continue
+						}
+						workerTargets[t] = target
+					}
+				}
+			}
+		}
+		t, _ := json.Marshal(workerTargets)
 		w.Write(t)
 	}
 
