@@ -1,0 +1,12 @@
+The stable release of the InfluxDB server is v0.8.8, however `go get` will
+fetch from master by default. The master branch in the InfluxDB repo is not
+compatible with 0.8.8 so we need to check out the 0.8.8 client library.
+
+To fetch the client package compatible with this version:
+
+1. go get -u github.com/influxdb/influxdb/client
+2. cd $GOPATH/github.com/influxdb/influxdb/client
+3. git checkout v0.8.8
+4. go install
+
+This won't be an issue once 0.9.0 is released.
