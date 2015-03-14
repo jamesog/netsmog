@@ -15,12 +15,13 @@ import (
 
 const version string = "0.1"
 
-type config struct {
-	Targets map[string]target
-}
+type config map[string]target
 
 type target struct {
 	Interval int
+	Title    string
+	Host     string
+	Probe    string
 }
 
 // TODO(jamesog):
