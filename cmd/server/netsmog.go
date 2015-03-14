@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/url"
 	"os"
 
 	"github.com/BurntSushi/toml"
@@ -50,13 +49,6 @@ func main() {
 		}
 	}
 
-	u := url.URL{
-		Scheme: "http",
-	}
-	u.Host = fmt.Sprintf("%s:%d", config.DB.Host, config.DB.Port)
-	u.User = url.UserPassword(config.DB.Username, config.DB.Password)
-	// log.Printf("%q\n", u)
-	// var dbClient *client.Client
 	dbClient, err := influxdb.NewClient(
 		&influxdb.ClientConfig{
 			Host:     config.DB.Host + ":" + fmt.Sprintf("%d", config.DB.Port),
