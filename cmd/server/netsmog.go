@@ -55,7 +55,7 @@ func main() {
 
 	dbClient, err := influxdb.NewClient(
 		&influxdb.ClientConfig{
-			Host:     config.DB.Host + ":" + fmt.Sprintf("%d", config.DB.Port),
+			Host:     fmt.Sprintf("%s:%d", config.DB.Host, config.DB.Port),
 			Username: config.DB.Username,
 			Password: config.DB.Password,
 			Database: config.DB.Database,
