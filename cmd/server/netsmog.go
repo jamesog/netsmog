@@ -50,7 +50,7 @@ func results(dbClient *influxdb.Client) {
 	}
 }
 
-func worker(c *map[string]TargetGroup) http.Handler {
+func workerHandler(c *map[string]TargetGroup) http.Handler {
 	// Pass the worker a JSON object with its tasks
 	json := func(w http.ResponseWriter, r *http.Request) {
 		worker := r.Header.Get("Worker")
@@ -117,7 +117,7 @@ func main() {
 		log.Println("Connected to InfluxDB.")
 	}
 
-	w := worker(&config.Targets)
+	w := workerHandler(&config.Targets)
 	http.Handle("/", handlers.LoggingHandler(os.Stdout, http.NotFoundHandler()))
 	http.Handle("/worker", handlers.LoggingHandler(os.Stdout, w))
 	log.Println("Listening on :8080")
