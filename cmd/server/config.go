@@ -32,7 +32,8 @@ type Worker struct {
 type TargetGroup map[string]Target
 
 type Target struct {
-	Title string
-	Probe string
-	Host  string
+	Title   string
+	Probe   string
+	Host    string
+	Workers []string
 }

@@ -35,7 +35,7 @@ func main() {
 		panic(err)
 	}
 
-	// fmt.Printf("Config: %s\n", config)
+	// fmt.Printf("Config: %+v\n", config)
 	fmt.Printf("Netsmog instance for %s\n", config.Main.Title)
 	fmt.Printf("This instance is maintained by %s\n\n", config.Main.Maintainer)
 
@@ -44,7 +44,11 @@ func main() {
 	}
 
 	for g, tgroup := range config.Targets {
+		fmt.Printf("Target group %s has workers %+v\n", g, tgroup["workers"].Workers)
 		for t, target := range tgroup {
+			if t == "workers" {
+				continue
+			}
 			fmt.Printf("Group: %s\nTarget: %s\nHost: %s\n\n", g, t, target.Host)
 		}
 	}
