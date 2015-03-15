@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -51,13 +50,13 @@ func results(dbClient *influxdb.Client) {
 	}
 }
 
-func workerHandler(c *map[string]TargetGroup) http.Handler {
-	// Pass the worker a JSON object with its tasks
-	json := func(w http.ResponseWriter, r *http.Request) {
+func workerHandler(c *map[string]TargetGroup, dbClient *influxdb.Client) http.Handler {
+	h := func(w http.ResponseWriter, r *http.Request) {
 		worker := r.Header.Get("Worker")
 		// TODO(jamesog): Tally this with the Authorisation header
 		switch {
 		case r.Method == "GET":
+			// Pass the worker a JSON object with its tasks
 			log.Println("Received request from", worker)
 			// Query the config for all targets this worker is a member of
 			// and create a new struct to pass to json.Marshal()
@@ -88,18 +87,45 @@ func workerHandler(c *map[string]TargetGroup) http.Handler {
 			}
 			t, _ := json.Marshal(workerTargets)
 			w.Write(t)
+
 		case r.Method == "POST":
+			// Receive JSON and write the data to the DB
 			log.Println("Received results from", worker)
 			body, err := ioutil.ReadAll(r.Body)
-			buf := bytes.NewBuffer(body)
 			if err != nil {
-				log.Println("Error reading request from client: ", err)
+				log.Println("Error reading request from client:", err)
+				return
 			}
-			fmt.Printf("%+v\n", buf.String())
+
+			var results map[string]ResultGroup
+			err = json.Unmarshal(body, &results)
+			if err != nil {
+				log.Println("Error unmarshalling results:", err)
+				return
+			}
+
+			var series []*influxdb.Series
+			for g, tg := range results {
+				for t, target := range tg {
+					for i := 0; i < len(target); i++ {
+						s := &influxdb.Series{}
+						s.Name = fmt.Sprintf("%s.%s", g, t)
+						s.Columns = []string{"worker", "value"}
+						s.Points = [][]interface{}{
+							[]interface{}{worker, target[i]},
+						}
+						series = append(series, s)
+					}
+				}
+			}
+			err = dbClient.WriteSeries(series)
+			if err != nil {
+				log.Println("Error writing series:", err)
+			}
 		}
 	}
 
-	return http.HandlerFunc(json)
+	return http.HandlerFunc(h)
 }
 
 func main() {
@@ -154,7 +180,7 @@ func main() {
 		log.Println("Connected to InfluxDB.")
 	}
 
-	w := workerHandler(&config.Targets)
+	w := workerHandler(&config.Targets, dbClient)
 	http.Handle("/", handlers.LoggingHandler(os.Stdout, http.NotFoundHandler()))
 	http.Handle("/worker", handlers.LoggingHandler(os.Stdout, w))
 	log.Println("Listening on :8080")
