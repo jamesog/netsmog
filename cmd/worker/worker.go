@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -45,19 +46,32 @@ func runProbe(g, t string, target *target) {
 	interval := target.Interval
 	count := target.Count
 	host := target.Host
+
+	type result []float64
+	type resultgroup map[string]result
+
 	go func() {
 		log.Printf("Launching %d %s probes every %ds against %s\n",
 			count, probe, interval, host)
+		results := make(map[string]resultgroup)
 		for {
 			time.Sleep(time.Duration(interval) * time.Second)
+			result := make(map[string]result)
 			for n := 1; n <= count; n++ {
 				log.Printf("PROBE %s (%d/%d): %s\n", probe, n, count, host)
 				// TODO(jamesog): Implement probe
+				result[t] = append(result[t], rand.Float64()*10)
+				results[g] = result
 			}
 			// TODO(jamesog): Submit results to server
 			log.Printf("Submitting results for %s.%s\n", g, t)
+			r, _ := json.Marshal(results)
 			// TODO(jamesog): If submit fails, cache it and retry later
 			// Perhaps all submits should be cached anyway
+			_, err := httpRequest("POST", server, r)
+			if err != nil {
+				fmt.Printf("%s.%s: Error sending results\n", g, t)
+			}
 		}
 	}()
 }
@@ -81,6 +95,7 @@ func makeAuthorisation() (string, error) {
 
 func httpRequest(method, server string, body []byte) (*http.Response, error) {
 	httpClient := &http.Client{}
+	httpClient.Timeout = 10 * time.Second
 	req, err := http.NewRequest(method, server, bytes.NewBuffer(body))
 	if err != nil {
 		log.Fatal("could not construct HTTP request")
