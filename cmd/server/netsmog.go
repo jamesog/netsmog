@@ -21,6 +21,8 @@ import (
 //  * UI for viewing graphs
 //  * worker API (fetch configs, post results)
 
+var config Config
+
 func results(dbClient *influxdb.Client) {
 	results, err := dbClient.Query("select * from www1", "s")
 	// fmt.Printf("%q\n", results)
@@ -147,7 +149,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var config Config
 	if err := toml.Unmarshal(buf, &config); err != nil {
 		panic(err)
 	}
@@ -190,8 +191,8 @@ func main() {
 	w := workerHandler(&config.Targets, dbClient)
 	http.Handle("/", handlers.LoggingHandler(os.Stdout, http.NotFoundHandler()))
 	http.Handle("/worker", handlers.LoggingHandler(os.Stdout, w))
-	log.Println("Listening on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	log.Println("Listening on", config.Main.Listen)
+	if err := http.ListenAndServe(config.Main.Listen, nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }
