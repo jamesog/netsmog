@@ -60,18 +60,28 @@ func workerHandler(c *map[string]TargetGroup) http.Handler {
 		// and create a new struct to pass to json.Marshal()
 		// TODO(jamesog): This only checks the "workers" virtual group
 		// It should also check inside each target
-		workerTargets := make(TargetGroup)
-		for _, group := range *c {
+		workerTargets := make(map[string]TargetGroup)
+		for g, group := range *c {
+			wg := make(map[string]Target)
 			for _, w := range group["workers"].Workers {
 				if w == worker {
 					for t, target := range group {
 						if t == "workers" {
 							continue
 						}
-						workerTargets[t] = target
+						wg[t] = target
 					}
 				}
 			}
+			if len(group["workers"].Workers) == 0 {
+				for t, target := range group {
+					if t == "workers" {
+						continue
+					}
+					wg[t] = target
+				}
+			}
+			workerTargets[g] = wg
 		}
 		t, _ := json.Marshal(workerTargets)
 		w.Write(t)

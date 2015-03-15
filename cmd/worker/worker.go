@@ -16,7 +16,9 @@ import (
 
 const version string = "0.1"
 
-type config map[string]target
+type config map[string]targetgroup
+
+type targetgroup map[string]target
 
 type target struct {
 	Interval int
@@ -30,18 +32,20 @@ type target struct {
 // Parse config, determine jobs to run and intervals
 // Implement probes
 
-func runProbe(target *target) {
-	probe := target.Probe
-	interval := target.Interval
-	host := target.Host
-	go func() {
-		log.Printf("Launching probe %s every %ds against %s\n",
-			probe, interval, host)
-		for {
-			time.Sleep(time.Duration(interval) * time.Second)
-			log.Printf("PROBE %s: %s\n", probe, host)
-		}
-	}()
+func runProbe(tg *targetgroup) {
+	for _, t := range *tg {
+		probe := t.Probe
+		interval := t.Interval
+		host := t.Host
+		go func() {
+			log.Printf("Launching probe %s every %ds against %s\n",
+				probe, interval, host)
+			for {
+				time.Sleep(time.Duration(interval) * time.Second)
+				log.Printf("PROBE %s: %s\n", probe, host)
+			}
+		}()
+	}
 }
 
 func main() {
