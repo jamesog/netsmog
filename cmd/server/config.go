@@ -39,3 +39,7 @@ type Target struct {
 	Host     string
 	Workers  []string
 }
+
+type Result []float64
+
+type ResultGroup map[string]Result
