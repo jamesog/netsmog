@@ -68,9 +68,13 @@ func runProbe(g, t string, target *target) {
 			r, _ := json.Marshal(results)
 			// TODO(jamesog): If submit fails, cache it and retry later
 			// Perhaps all submits should be cached anyway
-			_, err := httpRequest("POST", server, r)
+			resp, err := httpRequest("POST", server, r)
 			if err != nil {
-				fmt.Printf("%s.%s: Error sending results\n", g, t)
+				fmt.Printf("%s.%s: Error sending results: %s\n", g, t, err)
+				continue
+			}
+			if resp.StatusCode != http.StatusOK {
+				log.Printf("Server error, HTTP status: %d\n", resp.StatusCode)
 			}
 		}
 	}()
@@ -134,9 +138,9 @@ func main() {
 	log.Println("fetching configuration from ", server)
 	resp, err := httpRequest("GET", server, nil)
 	if err != nil {
-		log.Fatal("HTTP protocol error: ", err)
+		log.Fatal("Could not fetch config: ", err)
 	}
-	if resp.StatusCode == 200 {
+	if resp.StatusCode == http.StatusOK {
 		log.Println("got a response")
 	} else {
 		log.Fatal("something went wrong")

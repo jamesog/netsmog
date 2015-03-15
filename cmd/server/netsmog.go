@@ -85,7 +85,11 @@ func workerHandler(c *map[string]TargetGroup, dbClient *influxdb.Client) http.Ha
 				}
 				workerTargets[g] = wg
 			}
-			t, _ := json.Marshal(workerTargets)
+			t, err := json.Marshal(workerTargets)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
 			w.Write(t)
 
 		case r.Method == "POST":
@@ -94,6 +98,7 @@ func workerHandler(c *map[string]TargetGroup, dbClient *influxdb.Client) http.Ha
 			body, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				log.Println("Error reading request from client:", err)
+				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
 
@@ -101,6 +106,7 @@ func workerHandler(c *map[string]TargetGroup, dbClient *influxdb.Client) http.Ha
 			err = json.Unmarshal(body, &results)
 			if err != nil {
 				log.Println("Error unmarshalling results:", err)
+				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
 
@@ -122,6 +128,7 @@ func workerHandler(c *map[string]TargetGroup, dbClient *influxdb.Client) http.Ha
 			if err != nil {
 				log.Println("Error writing series:", err)
 			}
+			w.WriteHeader(http.StatusOK)
 		}
 	}
 
