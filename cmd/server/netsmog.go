@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -55,16 +56,27 @@ func workerHandler(c *map[string]TargetGroup) http.Handler {
 	json := func(w http.ResponseWriter, r *http.Request) {
 		worker := r.Header.Get("Worker")
 		// TODO(jamesog): Tally this with the Authorisation header
-		log.Println("Received request from", worker)
-		// Query the config for all targets this worker is a member of
-		// and create a new struct to pass to json.Marshal()
-		// TODO(jamesog): This only checks the "workers" virtual group
-		// It should also check inside each target
-		workerTargets := make(map[string]TargetGroup)
-		for g, group := range *c {
-			wg := make(map[string]Target)
-			for _, w := range group["workers"].Workers {
-				if w == worker {
+		switch {
+		case r.Method == "GET":
+			log.Println("Received request from", worker)
+			// Query the config for all targets this worker is a member of
+			// and create a new struct to pass to json.Marshal()
+			// TODO(jamesog): This only checks the "workers" virtual group
+			// It should also check inside each target
+			workerTargets := make(map[string]TargetGroup)
+			for g, group := range *c {
+				wg := make(map[string]Target)
+				for _, w := range group["workers"].Workers {
+					if w == worker {
+						for t, target := range group {
+							if t == "workers" {
+								continue
+							}
+							wg[t] = target
+						}
+					}
+				}
+				if len(group["workers"].Workers) == 0 {
 					for t, target := range group {
 						if t == "workers" {
 							continue
@@ -72,19 +84,19 @@ func workerHandler(c *map[string]TargetGroup) http.Handler {
 						wg[t] = target
 					}
 				}
+				workerTargets[g] = wg
 			}
-			if len(group["workers"].Workers) == 0 {
-				for t, target := range group {
-					if t == "workers" {
-						continue
-					}
-					wg[t] = target
-				}
+			t, _ := json.Marshal(workerTargets)
+			w.Write(t)
+		case r.Method == "POST":
+			log.Println("Received results from", worker)
+			body, err := ioutil.ReadAll(r.Body)
+			buf := bytes.NewBuffer(body)
+			if err != nil {
+				log.Println("Error reading request from client: ", err)
 			}
-			workerTargets[g] = wg
+			fmt.Printf("%+v\n", buf.String())
 		}
-		t, _ := json.Marshal(workerTargets)
-		w.Write(t)
 	}
 
 	return http.HandlerFunc(json)
