@@ -22,6 +22,7 @@ type targetgroup map[string]target
 
 type target struct {
 	Interval int
+	Count    int
 	Host     string
 	Probe    string
 }
@@ -36,13 +37,16 @@ func runProbe(tg *targetgroup) {
 	for _, t := range *tg {
 		probe := t.Probe
 		interval := t.Interval
+		count := t.Count
 		host := t.Host
 		go func() {
-			log.Printf("Launching probe %s every %ds against %s\n",
-				probe, interval, host)
+			log.Printf("Launching %d %s probes every %ds against %s\n",
+				count, probe, interval, host)
 			for {
 				time.Sleep(time.Duration(interval) * time.Second)
-				log.Printf("PROBE %s: %s\n", probe, host)
+				for n := 1; n <= count; n++ {
+					log.Printf("PROBE %s (%d/%d): %s\n", probe, n, count, host)
+				}
 			}
 		}()
 	}

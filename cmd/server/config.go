@@ -35,6 +35,7 @@ type Target struct {
 	Title    string
 	Probe    string
 	Interval int
+	Count    int
 	Host     string
 	Workers  []string
 }
