@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -12,6 +14,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/gorilla/handlers"
 	influxdb "github.com/influxdb/influxdb/client"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // TODO(jamesog):
@@ -55,11 +58,16 @@ func results(dbClient *influxdb.Client) {
 func workerHandler(c *map[string]TargetGroup, dbClient *influxdb.Client) http.Handler {
 	h := func(w http.ResponseWriter, r *http.Request) {
 		worker := r.Header.Get("Worker")
+		auth := r.Header.Get("Authorisation")
 		// TODO(jamesog): Tally this with the Authorisation header
 		switch {
 		case r.Method == "GET":
 			// Pass the worker a JSON object with its tasks
 			log.Println("Received request from", worker)
+			if err := checkAuthorisation(worker, auth); err != nil {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
 			// Query the config for all targets this worker is a member of
 			// and create a new struct to pass to json.Marshal()
 			// TODO(jamesog): This only checks the "workers" virtual group
@@ -97,6 +105,10 @@ func workerHandler(c *map[string]TargetGroup, dbClient *influxdb.Client) http.Ha
 		case r.Method == "POST":
 			// Receive JSON and write the data to the DB
 			log.Println("Received results from", worker)
+			if err := checkAuthorisation(worker, auth); err != nil {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
 			body, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				log.Println("Error reading request from client:", err)
@@ -135,6 +147,30 @@ func workerHandler(c *map[string]TargetGroup, dbClient *influxdb.Client) http.Ha
 	}
 
 	return http.HandlerFunc(h)
+}
+
+func checkAuthorisation(worker, enchash string) error {
+	buf, err := ioutil.ReadFile(config.Main.Secrets)
+	if err != nil {
+		log.Println("Error reading secrets:", err)
+		return err
+	}
+	var secrets map[string]string
+	if err := toml.Unmarshal(buf, &secrets); err != nil {
+		log.Println("Couldn't unmarshal secrets:", err)
+	}
+	want := []byte(fmt.Sprintf("%s:%s", worker, secrets[worker]))
+	hash, err := base64.URLEncoding.DecodeString(enchash)
+	if err != nil {
+		log.Printf("Could not decode hash:", err)
+		return err
+	}
+	err = bcrypt.CompareHashAndPassword(hash, want)
+	if err != nil {
+		log.Printf("SECURITY: %s authorisation is incorrect\n", worker)
+		return errors.New("Security fail")
+	}
+	return nil
 }
 
 func main() {

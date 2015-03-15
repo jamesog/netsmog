@@ -5,6 +5,7 @@ type Config struct {
 		Title      string
 		Maintainer string
 		Listen     string
+		Secrets    string
 	}
 	DB      DB
 	Probes  map[string]Probe
