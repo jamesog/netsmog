@@ -27,6 +27,12 @@ type target struct {
 	Probe    string
 }
 
+var (
+	server     string
+	secretFile string
+	worker     string
+)
+
 // TODO(jamesog):
 // Read shared secret from a file
 // Connect to server over HTTP and fetch config (must be santised)
@@ -58,22 +64,22 @@ func runProbe(g, t string, target *target) {
 func main() {
 	fmt.Println("NetSmog Worker, version", version)
 
-	var server = flag.String("server", "", "server URL")
-	var secretFile = flag.String("secret", "", "shared secret file")
+	flag.StringVar(&server, "server", "", "server URL")
+	flag.StringVar(&secretFile, "secret", "", "shared secret file")
 	defaultWorker, err := os.Hostname()
 	if err != nil {
 		log.Fatal("could not determine hostname")
 	}
-	var worker = flag.String("worker", defaultWorker, "worker name")
+	flag.StringVar(&worker, "worker", defaultWorker, "worker name")
 	flag.Parse()
-	if *server == "" {
+	if server == "" {
 		log.Fatal("no server specified")
 	}
-	if *secretFile == "" {
+	if secretFile == "" {
 		log.Fatal("no shared secret file specified")
 	}
 
-	secret, err := ioutil.ReadFile(*secretFile)
+	secret, err := ioutil.ReadFile(secretFile)
 	if err != nil {
 		log.Fatal("could not read shared secret: ", err)
 	}
@@ -91,14 +97,14 @@ func main() {
 	fmt.Println("Hash:", hashstr)
 
 	httpClient := &http.Client{}
-	req, err := http.NewRequest("GET", *server, nil)
+	req, err := http.NewRequest("GET", server, nil)
 	if err != nil {
 		log.Fatal("could not construct HTTP request")
 	}
 	req.Header.Add("User-Agent", fmt.Sprintf("NetSmog Worker version %s", version))
-	req.Header.Add("Worker", *worker)
+	req.Header.Add("Worker", worker)
 	req.Header.Add("Authorisation", hashstr)
-	log.Println("fetching configuration from ", *server)
+	log.Println("fetching configuration from ", server)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		log.Fatal("HTTP protocol error: ", err)
