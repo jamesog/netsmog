@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -81,11 +82,12 @@ func runProbe(g, t string, target *target) {
 }
 
 func makeAuthorisation() (string, error) {
-	secret, err := ioutil.ReadFile(secretFile)
+	s, err := ioutil.ReadFile(secretFile)
 	if err != nil {
 		log.Fatal("could not read shared secret: ", err)
 	}
 
+	secret := strings.TrimSpace(string(s))
 	hash, err := bcrypt.GenerateFromPassword(
 		[]byte(fmt.Sprintf("%s:%s", worker, secret)),
 		bcrypt.DefaultCost)
@@ -143,7 +145,7 @@ func main() {
 	if resp.StatusCode == http.StatusOK {
 		log.Println("got a response")
 	} else {
-		log.Fatal("something went wrong")
+		log.Fatal("Something went wrong. Server said: ", resp.Status)
 	}
 	var config config
 	jsonResponse, err := ioutil.ReadAll(resp.Body)
