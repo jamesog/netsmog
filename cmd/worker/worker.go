@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
@@ -61,6 +62,42 @@ func runProbe(g, t string, target *target) {
 	}()
 }
 
+func makeAuthorisation() (string, error) {
+	secret, err := ioutil.ReadFile(secretFile)
+	if err != nil {
+		log.Fatal("could not read shared secret: ", err)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword(
+		[]byte(fmt.Sprintf("%s:%s", worker, secret)),
+		bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
+	hashstr := base64.URLEncoding.EncodeToString(hash)
+	return hashstr, nil
+}
+
+func httpRequest(method, server string, body []byte) (*http.Response, error) {
+	httpClient := &http.Client{}
+	req, err := http.NewRequest(method, server, bytes.NewBuffer(body))
+	if err != nil {
+		log.Fatal("could not construct HTTP request")
+	}
+	// Construct HTTP header for passing an authorisation to the server
+	// This is a hash of worker:secret, similar to HTTP Basic
+	auth, err := makeAuthorisation()
+	if err != nil {
+		log.Fatal("could not generate authorisation")
+	}
+	req.Header.Add("User-Agent", fmt.Sprintf("NetSmog Worker version %s", version))
+	req.Header.Add("Worker", worker)
+	req.Header.Add("Authorisation", auth)
+	resp, err := httpClient.Do(req)
+	return resp, err
+}
+
 func main() {
 	fmt.Println("NetSmog Worker, version", version)
 
@@ -79,33 +116,8 @@ func main() {
 		log.Fatal("no shared secret file specified")
 	}
 
-	secret, err := ioutil.ReadFile(secretFile)
-	if err != nil {
-		log.Fatal("could not read shared secret: ", err)
-	}
-
-	// Construct HTTP header for passing an authorisation to the server
-	// This is a hash of worker:secret, similar to HTTP Basic
-	hash, err := bcrypt.GenerateFromPassword(
-		[]byte(fmt.Sprintf("%s:%s", worker, secret)),
-		bcrypt.DefaultCost)
-	if err != nil {
-		log.Fatal("could not generate hash")
-	}
-
-	hashstr := base64.URLEncoding.EncodeToString(hash)
-	fmt.Println("Hash:", hashstr)
-
-	httpClient := &http.Client{}
-	req, err := http.NewRequest("GET", server, nil)
-	if err != nil {
-		log.Fatal("could not construct HTTP request")
-	}
-	req.Header.Add("User-Agent", fmt.Sprintf("NetSmog Worker version %s", version))
-	req.Header.Add("Worker", worker)
-	req.Header.Add("Authorisation", hashstr)
 	log.Println("fetching configuration from ", server)
-	resp, err := httpClient.Do(req)
+	resp, err := httpRequest("GET", server, nil)
 	if err != nil {
 		log.Fatal("HTTP protocol error: ", err)
 	}
