@@ -33,23 +33,26 @@ type target struct {
 // Parse config, determine jobs to run and intervals
 // Implement probes
 
-func runProbe(tg *targetgroup) {
-	for _, t := range *tg {
-		probe := t.Probe
-		interval := t.Interval
-		count := t.Count
-		host := t.Host
-		go func() {
-			log.Printf("Launching %d %s probes every %ds against %s\n",
-				count, probe, interval, host)
-			for {
-				time.Sleep(time.Duration(interval) * time.Second)
-				for n := 1; n <= count; n++ {
-					log.Printf("PROBE %s (%d/%d): %s\n", probe, n, count, host)
-				}
+func runProbe(g, t string, target *target) {
+	probe := target.Probe
+	interval := target.Interval
+	count := target.Count
+	host := target.Host
+	go func() {
+		log.Printf("Launching %d %s probes every %ds against %s\n",
+			count, probe, interval, host)
+		for {
+			time.Sleep(time.Duration(interval) * time.Second)
+			for n := 1; n <= count; n++ {
+				log.Printf("PROBE %s (%d/%d): %s\n", probe, n, count, host)
+				// TODO(jamesog): Implement probe
 			}
-		}()
-	}
+			// TODO(jamesog): Submit results to server
+			log.Printf("Submitting results for %s.%s\n", g, t)
+			// TODO(jamesog): If submit fails, cache it and retry later
+			// Perhaps all submits should be cached anyway
+		}
+	}()
 }
 
 func main() {
@@ -115,10 +118,11 @@ func main() {
 		log.Fatal("config error")
 	}
 	log.Println("so far so good")
-	// fmt.Printf("Config:\n%+v\n", config)
 	c := make(chan struct{})
-	for _, target := range config {
-		runProbe(&target)
+	for g, tg := range config {
+		for t, target := range tg {
+			runProbe(g, t, &target)
+		}
 	}
 	<-c
 }
