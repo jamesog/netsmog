@@ -75,19 +75,19 @@ func workerHandler(c *map[string]TargetGroup, dbClient *influxdb.Client) http.Ha
 			workerTargets := make(map[string]TargetGroup)
 			for g, group := range *c {
 				wg := make(map[string]Target)
-				for _, w := range group["workers"].Workers {
+				for _, w := range group["meta"].Workers {
 					if w == worker {
 						for t, target := range group {
-							if t == "workers" {
+							if t == "meta" {
 								continue
 							}
 							wg[t] = target
 						}
 					}
 				}
-				if len(group["workers"].Workers) == 0 {
+				if len(group["meta"].Workers) == 0 {
 					for t, target := range group {
-						if t == "workers" {
+						if t == "meta" {
 							continue
 						}
 						wg[t] = target
