@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jamesog/netsmog/probes/ping"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -61,7 +62,18 @@ func runProbe(g, t string, target *target) {
 			for n := 1; n <= count; n++ {
 				log.Printf("PROBE %s (%d/%d): %s\n", probe, n, count, host)
 				// TODO(jamesog): Implement probe
-				result[t] = append(result[t], rand.Float64()*10)
+				switch probe {
+				case "ping":
+					d, err := ping.Ping(host)
+					if err != nil {
+						log.Printf("%q\n", err)
+						continue
+					}
+					time := d.Seconds() * 1000
+					result[t] = append(result[t], time)
+				default:
+					result[t] = append(result[t], rand.Float64()*10)
+				}
 				results[g] = result
 			}
 			// TODO(jamesog): Submit results to server
