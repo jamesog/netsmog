@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jamesog/netsmog/probes/ping"
+	"github.com/jamesog/netsmog/probe"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -44,7 +44,7 @@ var (
 // Implement probes
 
 func runProbe(g, t string, target *target) {
-	probe := target.Probe
+	probetype := target.Probe
 	interval := target.Interval
 	count := target.Count
 	host := target.Host
@@ -54,29 +54,33 @@ func runProbe(g, t string, target *target) {
 
 	go func() {
 		log.Printf("Launching %d %s probes every %ds against %s\n",
-			count, probe, interval, host)
+			count, probetype, interval, host)
 		results := make(map[string]resultgroup)
 		for {
 			time.Sleep(time.Duration(interval) * time.Second)
 			result := make(map[string]result)
 			for n := 1; n <= count; n++ {
-				log.Printf("PROBE %s (%d/%d): %s\n", probe, n, count, host)
-				// TODO(jamesog): Implement probe
-				switch probe {
+				log.Printf("PROBE %s (%d/%d): %s\n", probetype, n, count, host)
+				var d time.Duration
+				var err error
+				switch probetype {
 				case "ping":
-					d, err := ping.Ping(host)
-					if err != nil {
-						log.Printf("%q\n", err)
-						continue
-					}
-					time := d.Seconds() * 1000
-					result[t] = append(result[t], time)
+					d, err = probe.Ping(host)
 				default:
 					result[t] = append(result[t], rand.Float64()*10)
 				}
+				if err != nil {
+					log.Printf("%q\n", err)
+					continue
+				}
+				time := d.Seconds() * 1000
+				result[t] = append(result[t], time)
 				results[g] = result
 			}
-			// TODO(jamesog): Submit results to server
+			if len(results) == 0 {
+				log.Printf("Not submitting results for %s.%s: no results\n", g, t)
+				continue
+			}
 			log.Printf("Submitting results for %s.%s\n", g, t)
 			r, _ := json.Marshal(results)
 			// TODO(jamesog): If submit fails, cache it and retry later
