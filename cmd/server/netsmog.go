@@ -10,6 +10,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/BurntSushi/toml"
 	"github.com/gorilla/handlers"
@@ -173,10 +175,8 @@ func checkAuthorisation(worker, enchash string) error {
 	return nil
 }
 
-func main() {
-	var confFile = flag.String("config", "config.toml", "config file, in TOML format")
-	flag.Parse()
-	f, err := os.Open(*confFile)
+func parseConfig(file string) {
+	f, err := os.Open(file)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -188,6 +188,23 @@ func main() {
 	if err := toml.Unmarshal(buf, &config); err != nil {
 		panic(err)
 	}
+}
+
+func main() {
+	var confFile = flag.String("config", "config.toml", "config file, in TOML format")
+	flag.Parse()
+	parseConfig(*confFile)
+
+	// Listen for SIGHUP to notify us to re-read the config file.
+	sighup := make(chan os.Signal, 1)
+	signal.Notify(sighup, syscall.SIGHUP)
+	go func() {
+		for {
+			sig := <-sighup
+			log.Printf("Received %s, reloading config.\n", sig)
+			parseConfig(*confFile)
+		}
+	}()
 
 	// fmt.Printf("Config: %+v\n", config)
 	fmt.Printf("Netsmog instance for %s\n", config.Main.Title)
