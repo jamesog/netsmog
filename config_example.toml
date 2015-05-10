@@ -1,0 +1,59 @@
+# Example NetSmog server configuration file.
+
+# Main - General server configuration.
+# Title and maintainer are displayed in the UI.
+# Listen is the address:port the server should listen on.
+# Secrets contains the probe shared secrets for authentication.
+[main]
+title = "NetSmog Example Instance"
+maintainer = "Admin <admin@example.com>"
+listen = ":8080"
+secrets = "secrets.toml"
+
+# InfluxDB database connection information.
+[db]
+host = "127.0.0.1"
+port = 8086
+database = "netsmog"
+username = "netsmog"
+password = "netsmog"
+
+# This describes a worker called worker1.
+# The display name is the friendly name used in the UI.
+[workers.worker1]
+hostname = "worker1.example.com"
+display = "Worker 1"
+
+[workers.worker2]
+hostname = "worker2.example.com"
+display = "Worker 2"
+
+# An example target group called ping.
+# The groups are used for hierarchy in the UI.
+# Groups can have many targets, each using different probes.
+#
+# meta describes the group, example_org is a probe ID.
+# Note that the probe ID cannot contain dots.
+[targets.ping.meta]
+# Title for the group to be displayed in the UI.
+title = "Network probes"
+# The ping group will only run on worker1. If workers is not defined, the
+# group will run on all workers.
+workers = ["worker1"]
+
+[targets.ping.example_com]
+title = "example.com ping"
+# The probe's target host. Can be a DNS name or an IP address.
+host = "example.com"
+probe = "ping"
+# Interval (in seconds) to run this probe.
+interval = 10
+# How many probes to run each interval.
+count = 5
+
+[targets.ping.dns1_example_com]
+title = "dns1.example.com ping"
+host = "dns1.example.com"
+probe = "ping"
+interval = 30
+count = 10
