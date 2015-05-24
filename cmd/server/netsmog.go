@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"text/template"
 
 	"github.com/BurntSushi/toml"
 	"github.com/gorilla/handlers"
@@ -55,6 +56,15 @@ func results(dbClient *influxdb.Client) {
 			fmt.Println()
 		}
 	}
+}
+
+func uiHandler() http.Handler {
+	ui := func(w http.ResponseWriter, r *http.Request) {
+		tmpl := template.Must(template.ParseFiles("template/index.html.tmpl"))
+		tmpl.Execute(w, config.Targets)
+	}
+
+	return http.HandlerFunc(ui)
 }
 
 func workerHandler(c *map[string]TargetGroup, dbClient *influxdb.Client) http.Handler {
@@ -207,7 +217,7 @@ func main() {
 	}()
 
 	// fmt.Printf("Config: %+v\n", config)
-	fmt.Printf("Netsmog instance for %s\n", config.Main.Title)
+	log.Printf("Netsmog instance for %s\n", config.Main.Title)
 	fmt.Printf("This instance is maintained by %s\n\n", config.Main.Maintainer)
 
 	for s, worker := range config.Workers {
@@ -241,8 +251,10 @@ func main() {
 		log.Println("Connected to InfluxDB.")
 	}
 
+	ui := uiHandler()
 	w := workerHandler(&config.Targets, dbClient)
-	http.Handle("/", handlers.LoggingHandler(os.Stdout, http.NotFoundHandler()))
+	http.Handle("/", handlers.LoggingHandler(os.Stdout, ui))
+	http.Handle("/favicon.ico", handlers.LoggingHandler(os.Stdout, http.NotFoundHandler()))
 	http.Handle("/worker", handlers.LoggingHandler(os.Stdout, w))
 	log.Println("Listening on", config.Main.Listen)
 	if err := http.ListenAndServe(config.Main.Listen, nil); err != nil {
