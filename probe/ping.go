@@ -25,7 +25,10 @@ func dnsResolve(host string) (net.Addr, error) {
 	if err != nil {
 		return nil, err
 	}
-	if ips[0].To16() != nil && ips[0].To4() != nil {
+	// Picking the first IP is not ideal - should possibly randomise this.
+	// This is safe, however. The resolver orders IPv6/IPv4 based on system
+	// capability.
+	if ips[0].To16() != nil || ips[0].To4() != nil {
 		return &net.IPAddr{IP: ips[0]}, nil
 	}
 	return nil, errors.New("no A or AAAA record found")
@@ -41,14 +44,17 @@ func Ping(host string) (time.Duration, error) {
 
 	var listen, network string
 	var icmpType icmp.Type
+	var ipver uint8
 	ip := dst.(*net.IPAddr)
 	if ip.IP.To4() != nil {
 		listen = "0.0.0.0"
 		network = "ip4:icmp"
+		ipver = 4
 		icmpType = ipv4.ICMPTypeEcho
-	} else if ip.IP.To16() != nil && ip.IP.To4() != nil {
+	} else if ip.IP.To16() != nil && ip.IP.To4() == nil {
 		listen = "::"
 		network = "ip6:ipv6-icmp"
+		ipver = 6
 		icmpType = ipv6.ICMPTypeEchoRequest
 	}
 
@@ -91,7 +97,13 @@ func Ping(host string) (time.Duration, error) {
 		fmt.Println(err)
 		return zeroTime, err
 	}
-	readMsg, err := icmp.ParseMessage(iana.ProtocolICMP, readBytes[:n])
+	var proto int = 0
+	if ipver == 4 {
+		proto = iana.ProtocolICMP
+	} else if ipver == 6 {
+		proto = iana.ProtocolIPv6ICMP
+	}
+	readMsg, err := icmp.ParseMessage(proto, readBytes[:n])
 	if err != nil {
 		fmt.Println(err)
 		return zeroTime, err
@@ -100,7 +112,7 @@ func Ping(host string) (time.Duration, error) {
 	case ipv4.ICMPTypeEchoReply, ipv6.ICMPTypeEchoReply:
 		log.Printf("got reply from %v\n", peer)
 	default:
-		log.Printf("got %+v; want echo reply\n", readMsg)
+		return zeroTime, errors.New(fmt.Sprintf("got %+v; want echo reply\n", readMsg))
 	}
 	// Mark when we finished receiving
 	t1 := time.Now()
